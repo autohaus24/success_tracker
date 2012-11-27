@@ -23,7 +23,19 @@ module SuccessTracker
       store(identifier, "1")
     end
 
-    def failure(identifier, notify_rule)
+    # yields the given code block and then marks success. In case a exception was triggered it marks a failure and reraises the exception (arguments see the #failure method
+    def track(identifier, notify_rule, failure_options={})
+      result = yield
+      success(identifier)
+      return result
+    rescue => exception
+      failure(identifier, notify_rule, failure_options) { raise exception }
+    end
+
+    # +identifier+ is the key used for grouping success and failure cases together. +notify_rule+ is a symbol identifying the code block which is evaluated to know if the error is significant or not.
+    # + failure_options+ is a hash which currently can only contain the list of exceptions which should be tagged with the NonSignificantError module
+    # the given block is always evaluated and the resulting errors are tagged with the NonSignificantError and reraised
+    def failure(identifier, notify_rule, failure_options={})
       options[:on_failure].call(identifier) if options[:on_failure]
       store(identifier, nil)
 
@@ -31,7 +43,7 @@ module SuccessTracker
 
       begin
         yield if block_given?
-      rescue => error
+      rescue *(failure_options[:exceptions] || [StandardError]) => error
         error.extend(NonSignificantError) unless notify
         raise
       end

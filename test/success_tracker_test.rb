@@ -54,6 +54,24 @@ class SuccessTracker::BaseTest < Test::Unit::TestCase
     assert @output_from_block
   end
 
+  should "track success" do
+    success_tracker = SuccessTracker::Base.new(@redis)
+    success_tracker.track("success_tracker_test_key", :percent_10) { "working block" }
+    assert_equal ["1"], @redis.lrange("success_tracker_test_key", 0, -1)
+  end
+
+  should "track failure and reraise tagged exception" do
+    success_tracker = SuccessTracker::Base.new(@redis)
+    begin
+      success_tracker.track("success_tracker_test_key", :percent_10) { raise ArgumentError }
+      flunk "should have raised an exception before"
+    rescue => exception
+      assert ArgumentError === exception, "exception should be an ArgumentError"
+      assert SuccessTracker::NonSignificantError === exception, "exception should be a NonSignificantError"
+    end
+    assert_equal [""], @redis.lrange("success_tracker_test_key", 0, -1)
+  end
+
   context "ratio_rule" do
     should "return false until threshold of x percent is reached" do
       rule = SuccessTracker::Base.ratio_rule(0.1)
@@ -111,6 +129,17 @@ class SuccessTracker::BaseTest < Test::Unit::TestCase
         flunk "should raise exception before"
       rescue NoMethodError => exception
         assert SuccessTracker::NonSignificantError === exception, "should have the module before meeting the error condition"
+      end
+    end
+
+    should "not reraise errors from failure block extended with module" do
+      begin
+        @success_tracker.failure("success_tracker_test_key", :always_below_threshold, :exceptions => [ ArgumentError ]) do
+          raise NoMethodError
+        end
+        flunk "should raise exception before"
+      rescue NoMethodError => exception
+        assert !(SuccessTracker::NonSignificantError === exception), "should not have the module for an NoMethodError"
       end
     end
 
