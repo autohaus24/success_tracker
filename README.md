@@ -26,7 +26,7 @@ if $success_tracker.failure('mytask', :percent_10)
 end
 ```
 
-You can define additional errors with your own code blocks or use the sequence_rule or ratio_rule class methods for this task. These code blocks get an array of the recorded notifications as parameters which can have between 0 and 100 elements all having either an empty string (failure) or a "1" (success).
+You can define additional rules with your own code blocks or use the sequence_rule or ratio_rule class methods for this task. These code blocks get an array of the recorded notifications as parameters which can have between 0 and 100 elements all having either an empty string (failure) or a "1" (success).
 
 ```ruby
 $success_tracker = SuccessTracker::Base.new(redis_connection, :rules => {
@@ -48,6 +48,15 @@ Airbrake.configure do |config|
   config.ignore_by_filter do |notice|
     SuccessTracker::NonSignificantError === notice.exception
   end
+end
+```
+
+By default all StandardErrors are extended but in the options you can define an array with the exceptions which should be tagged.
+
+```ruby
+$success_tracker = SuccessTracker::Base.new(redis_connection)
+$success_tracker.failure('mytask', :percent_10, :exceptions => [ MySpecialError ]) do
+  raise ArgumentError # will not be tagged because it is the wrong exception type
 end
 ```
 
