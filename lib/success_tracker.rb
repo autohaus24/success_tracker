@@ -6,36 +6,39 @@ module SuccessTracker
   end
 
   class Base
-    attr_accessor :options, :rules, :redis, :list_length
+    attr_accessor :callbacks, :rules, :redis, :list_length
 
     def initialize(redis, options={})
       @redis = redis
+
       @rules = {
         :percent_10 => self.class.ratio_rule(0.1),
         :sequence_of_5 => self.class.sequence_rule(5),
       }.merge(options.delete(:rules) || {})
-      @options = options
+      @callbacks = options.delete(:callbacks) || {}
+      raise ArgumentError unless options.empty?
+
       @list_length = 100
     end
 
     def success(identifier)
-      options[:on_success].call(identifier) if options[:on_success]
+      callbacks[:success].call(identifier) if callbacks[:success]
       store(identifier, "1")
     end
 
     # +identifier+ is the key used for grouping success and failure cases together.
     # +notify_rule+ is a symbol identifying the code block which is evaluated to know if the error is significant or not.
-    # + failure_options+ is a hash which currently can only contain the list of exceptions which should be tagged with the NonSignificantError module
+    # + options+ is a hash which currently can only contain the list of exceptions which should be tagged with the NonSignificantError module
     # the given block is always evaluated and the resulting errors are tagged with the NonSignificantError and reraised
-    def failure(identifier, notify_rule, failure_options={})
-      options[:on_failure].call(identifier) if options[:on_failure]
+    def failure(identifier, notify_rule, options={})
+      callbacks[:failure].call(identifier) if callbacks[:failure]
       store(identifier, nil)
 
       redis.del(identifier) if notify = rules[notify_rule].call(redis.lrange(identifier, 0,-1))
 
       begin
         yield if block_given?
-      rescue *(failure_options[:exceptions] || [StandardError]) => error
+      rescue *(options[:exceptions] || [StandardError]) => error
         error.extend(NonSignificantError) unless notify
         raise
       end
@@ -44,10 +47,10 @@ module SuccessTracker
     end
 
     # yields the given code block and then marks success. In case a exception was triggered it marks a failure and reraises the exception (for the arguments see the #failure method)
-    def track(identifier, notify_rule, failure_options={})
+    def track(identifier, notify_rule, options={})
       yield.tap { success(identifier) }
     rescue => exception
-      failure(identifier, notify_rule, failure_options) { raise exception }
+      failure(identifier, notify_rule, options) { raise exception }
     end
 
 

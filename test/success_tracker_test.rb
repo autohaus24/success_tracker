@@ -26,17 +26,23 @@ class SuccessTracker::BaseTest < Test::Unit::TestCase
   end
 
   should "yield the success callback on success" do
-    success_tracker = SuccessTracker::Base.new(@redis, :on_success => lambda { |identifier| @identifier = "success: #{identifier}" })
+    success_tracker = SuccessTracker::Base.new(@redis, :callbacks => { :success => lambda { |identifier| @identifier = "success: #{identifier}" } })
     success_tracker.success("success_tracker_test_key")
 
     assert_equal "success: success_tracker_test_key", @identifier
   end
 
   should "yield the failure callback on failure" do
-    success_tracker = SuccessTracker::Base.new(@redis, :on_failure => lambda { |identifier| @identifier = "failure: #{identifier}" })
+    success_tracker = SuccessTracker::Base.new(@redis, :callbacks => { :failure => lambda { |identifier| @identifier = "failure: #{identifier}" } })
     success_tracker.failure("success_tracker_test_key", :percent_10)
 
     assert_equal "failure: success_tracker_test_key", @identifier
+  end
+
+  should "raise an ArgumentError when initializing with unknown options" do
+    assert_raise(ArgumentError) do
+      SuccessTracker::Base.new(@redis, :foo => "bar")
+    end
   end
 
   should "allow a maximum number of records" do
