@@ -60,6 +60,11 @@ class SuccessTracker::BaseTest < Test::Unit::TestCase
     assert_equal ["1"], @redis.lrange("success_tracker_test_key", 0, -1)
   end
 
+  should "return result from block on #track" do
+    success_tracker = SuccessTracker::Base.new(@redis)
+    assert_equal "result", success_tracker.track("success_tracker_test_key", :percent_10) { "result" }
+  end
+
   should "track failure and reraise tagged exception" do
     success_tracker = SuccessTracker::Base.new(@redis)
     begin
