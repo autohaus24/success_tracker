@@ -5,38 +5,40 @@ require 'success_tracker'
 class SuccessTracker::BaseTest < Test::Unit::TestCase
   def setup
     @redis = Redis.new
+    @prefix = "success_tracker"
+    @key = "test_key"
   end
 
   def teardown
-    @redis.del("success_tracker_test_key")
+    @redis.del("#{@prefix}:#{@key}")
   end
 
   should "store a success in the given redis key" do
     success_tracker = SuccessTracker::Base.new(@redis)
-    success_tracker.success("success_tracker_test_key")
+    success_tracker.success(@key)
 
-    assert_equal ["1"], @redis.lrange("success_tracker_test_key", 0, -1)
+    assert_equal ["1"], @redis.lrange("#{@prefix}:#{@key}", 0, -1)
   end
 
   should "store an error in the given redis key" do
     success_tracker = SuccessTracker::Base.new(@redis)
-    success_tracker.failure("success_tracker_test_key", :percent_10)
+    success_tracker.failure(@key, :percent_10)
 
-    assert_equal [""], @redis.lrange("success_tracker_test_key", 0, -1)
+    assert_equal [""], @redis.lrange("#{@prefix}:#{@key}", 0, -1)
   end
 
   should "yield the success callback on success" do
     success_tracker = SuccessTracker::Base.new(@redis, :callbacks => { :success => lambda { |identifier| @identifier = "success: #{identifier}" } })
-    success_tracker.success("success_tracker_test_key")
+    success_tracker.success(@key)
 
-    assert_equal "success: success_tracker_test_key", @identifier
+    assert_equal "success: #{@key}", @identifier
   end
 
   should "yield the failure callback on failure" do
     success_tracker = SuccessTracker::Base.new(@redis, :callbacks => { :failure => lambda { |identifier| @identifier = "failure: #{identifier}" } })
-    success_tracker.failure("success_tracker_test_key", :percent_10)
+    success_tracker.failure(@key, :percent_10)
 
-    assert_equal "failure: success_tracker_test_key", @identifier
+    assert_equal "failure: #{@key}", @identifier
   end
 
   should "raise an ArgumentError when initializing with unknown options" do
@@ -47,13 +49,13 @@ class SuccessTracker::BaseTest < Test::Unit::TestCase
 
   should "allow a maximum number of records" do
     success_tracker = SuccessTracker::Base.new(@redis)
-    105.times { success_tracker.success("success_tracker_test_key") }
-    assert_equal 100, @redis.lrange("success_tracker_test_key", 0, -1).length
+    105.times { success_tracker.success(@key) }
+    assert_equal 100, @redis.lrange("#{@prefix}:#{@key}", 0, -1).length
   end
 
   should "yield failure block" do
     success_tracker = SuccessTracker::Base.new(@redis)
-    success_tracker.failure("success_tracker_test_key", :percent_10) do
+    success_tracker.failure(@key, :percent_10) do
       @output_from_block = true
     end
 
@@ -62,25 +64,25 @@ class SuccessTracker::BaseTest < Test::Unit::TestCase
 
   should "track success" do
     success_tracker = SuccessTracker::Base.new(@redis)
-    success_tracker.track("success_tracker_test_key", :percent_10) { "working block" }
-    assert_equal ["1"], @redis.lrange("success_tracker_test_key", 0, -1)
+    success_tracker.track(@key, :percent_10) { "working block" }
+    assert_equal ["1"], @redis.lrange("#{@prefix}:#{@key}", 0, -1)
   end
 
   should "return result from block on #track" do
     success_tracker = SuccessTracker::Base.new(@redis)
-    assert_equal "result", success_tracker.track("success_tracker_test_key", :percent_10) { "result" }
+    assert_equal "result", success_tracker.track(@key, :percent_10) { "result" }
   end
 
   should "track failure and reraise tagged exception" do
     success_tracker = SuccessTracker::Base.new(@redis)
     begin
-      success_tracker.track("success_tracker_test_key", :percent_10) { raise ArgumentError }
+      success_tracker.track(@key, :percent_10) { raise ArgumentError }
       flunk "should have raised an exception before"
     rescue => exception
       assert ArgumentError === exception, "exception should be an ArgumentError"
       assert SuccessTracker::NonSignificantError === exception, "exception should be a NonSignificantError"
     end
-    assert_equal [""], @redis.lrange("success_tracker_test_key", 0, -1)
+    assert_equal [""], @redis.lrange("#{@prefix}:#{@key}", 0, -1)
   end
 
   context "ratio_rule" do
@@ -112,7 +114,7 @@ class SuccessTracker::BaseTest < Test::Unit::TestCase
 
     should "reraise errors from failure block not extended with module" do
       begin
-        @success_tracker.failure("success_tracker_test_key", :never_below_threshold) do
+        @success_tracker.failure(@key, :never_below_threshold) do
           raise NoMethodError
         end
         flunk "should raise exception before"
@@ -122,8 +124,8 @@ class SuccessTracker::BaseTest < Test::Unit::TestCase
     end
 
     should "empty the list" do
-      @success_tracker.failure("success_tracker_test_key", :never_below_threshold)
-      assert_equal [], @redis.lrange("success_tracker_test_key", 0, -1)
+      @success_tracker.failure(@key, :never_below_threshold)
+      assert_equal [], @redis.lrange("#{@prefix}:#{@key}", 0, -1)
     end
   end
 
@@ -134,7 +136,7 @@ class SuccessTracker::BaseTest < Test::Unit::TestCase
 
     should "reraise errors from failure block extended with module" do
       begin
-        @success_tracker.failure("success_tracker_test_key", :always_below_threshold) do
+        @success_tracker.failure(@key, :always_below_threshold) do
           raise NoMethodError
         end
         flunk "should raise exception before"
@@ -145,7 +147,7 @@ class SuccessTracker::BaseTest < Test::Unit::TestCase
 
     should "not reraise errors from failure block extended with module" do
       begin
-        @success_tracker.failure("success_tracker_test_key", :always_below_threshold, :exceptions => [ ArgumentError ]) do
+        @success_tracker.failure(@key, :always_below_threshold, :exceptions => [ ArgumentError ]) do
           raise NoMethodError
         end
         flunk "should raise exception before"
@@ -155,8 +157,8 @@ class SuccessTracker::BaseTest < Test::Unit::TestCase
     end
 
     should "not empty the list" do
-      @success_tracker.failure("success_tracker_test_key", :always_below_threshold)
-      assert_equal [""], @redis.lrange("success_tracker_test_key", 0, -1)
+      @success_tracker.failure(@key, :always_below_threshold)
+      assert_equal [""], @redis.lrange("#{@prefix}:#{@key}", 0, -1)
     end
   end
 end

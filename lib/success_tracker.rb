@@ -21,6 +21,8 @@ module SuccessTracker
       @list_length = 100
     end
 
+    def prefix(identifier); "success_tracker:#{identifier}" end
+
     def success(identifier)
       callbacks[:success].call(identifier) if callbacks[:success]
       store(identifier, "1")
@@ -34,7 +36,7 @@ module SuccessTracker
       callbacks[:failure].call(identifier) if callbacks[:failure]
       store(identifier, nil)
 
-      redis.del(identifier) if notify = rules[notify_rule].call(redis.lrange(identifier, 0,-1))
+      redis.del(prefix(identifier)) if notify = rules[notify_rule].call(redis.lrange(prefix(identifier), 0,-1))
 
       begin
         yield if block_given?
@@ -66,8 +68,8 @@ module SuccessTracker
 
     protected
     def store(identifier, value)
-      redis.lpush("#{identifier}", value)
-      redis.ltrim("#{identifier}", 0, @list_length - 1)
+      redis.lpush(prefix(identifier), value)
+      redis.ltrim(prefix(identifier), 0, @list_length - 1)
     end
   end
 end
