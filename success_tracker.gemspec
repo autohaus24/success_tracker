@@ -4,10 +4,11 @@ $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 require 'success_tracker/version'
 
 Gem::Specification.new do |gem|
+  gem.homepage      = "https://github.com/autohaus24/success_tracker"
   gem.name          = "success_tracker"
   gem.version       = SuccessTracker::VERSION
   gem.authors       = ["Michael Raidel"]
-  gem.email         = ["raidel@induktiv.at"]
+  gem.email         = ["m.raidel@autohaus24.de"]
   gem.description   = %q{SuccessTracker allows you to track success and failure of tasks}
   gem.summary       = %q{SuccessTracker allows you to track success and failure of tasks and define thresholds for unexpected failure conditions.}
 
