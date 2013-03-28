@@ -85,4 +85,4 @@ $success_tracker = SuccessTracker::Base.new(redis_connection, {
 
 ## License
 
-Copyright 2012 autohaus24 GmbH
+MIT License. Copyright 2013 autohaus24 GmbH
